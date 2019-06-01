@@ -1,0 +1,39 @@
+---
+- hosts: discourses
+  vars:
+    ansible_python_interpreter: auto_silent
+
+  tasks:
+  - name: Update server OS (apt update && apt dist-upgrade && apt autoremove && apt autoclean)
+    become: yes
+    apt:
+      update-cache: yes
+      upgrade: dist
+      autoremove: yes
+      autoclean: yes
+
+  - name: Update Discourse code from GitHub (cd /var/discourse && git pull)
+    become: yes
+    git:
+      repo: 'https://github.com/discourse/discourse_docker.git'
+      dest: /var/discourse
+      update: yes
+      version: master
+    register: gitcommit
+
+  - name: Rebuild the Discourse container (cd /var/discourse && ./launcher rebuild app)
+    become: yes
+    shell: ./launcher rebuild app
+    args:
+      chdir: /var/discourse
+    when: gitcommit.changed
+
+  - name: Clean up stopped containers (cd /var/discourse && ./launcher cleanup)
+    become: yes
+    shell: echo Y | ./launcher cleanup
+    args:
+      chdir: /var/discourse
+
+  - name: Reboot machine with default Ansible settings
+    reboot:
+    become: yes
